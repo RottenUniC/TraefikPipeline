@@ -1,0 +1,73 @@
+version: '3.2'
+services:
+  ilias-db:
+    image: mysql:5.7
+    container_name: ilias-db
+    restart: unless-stopped
+    command:
+      --character-set-server=utf8
+      --collation-server=utf8_general_ci
+      --max-allowed-packet=16M
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./db:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=ilias
+      - MYSQL_USER=ilias
+      - MYSQL_PASSWORD=test ## PW öndern
+      - MYSQL_ROOT_PASSWORD=test ## PW öndern
+  ilias-app:
+    image: sturai/ilias
+    container_name: ilias-app
+    restart: unless-stopped
+    depends_on:
+      - ilias-db
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./html:/var/www/html/data
+      - ./data:/var/iliasdata/ilias
+    environment:
+      - ILIAS_AUTO_SETUP=1
+      - ILIAS_DB_HOST=ilias-db
+      - ILIAS_DB_NAME=ilias
+      - ILIAS_DB_USER=ilias
+      - ILIAS_DB_PASSWORD=test ## PW wie oben
+      - ILIAS_ROOT_PASSWORD= sicheresKennwort ## PW öndern
+      - ILIAS_SETUP_PASSWORD= sicheresKennwort ## PW öndern
+      - ILIAS_CLIENT_NAME=default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ilias.entrypoints=web"
+      - "traefik.http.routers.ilias.rule=PathPrefix(`/ilias`)" ## DOMAIN ÄNDERN
+      ## - "traefik.http.middlewares.ilias-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.routers.ilias.middlewares=ilias-https-redirect"
+      - "traefik.http.routers.ilias-secure.entrypoints=websecure"
+      - "traefik.http.routers.ilias-secure.rule=PathPrefix(`/ilias`)" ## DOMAIN ÄNDERN
+      - "traefik.http.routers.ilias-secure.tls=true"
+      - "traefik.http.routers.ilias-secure.tls.certresolver=http"
+      - "traefik.http.routers.ilias-secure.service=ilias"
+      - "traefik.http.services.ilias.loadbalancer.server.port=80"
+      - "traefik.docker.network=web"
+      - "traefik.http.routers.ilias-secure.middlewares=secHeaders@file"
+    networks:
+      - default
+      - web
+  ilias-server:
+    image: sturai/ilias-ilserver
+    container_name: ilias-server
+    restart: unless-stopped
+    depends_on:
+      - ilias-app
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./lucened:/var/lucenedata/ilias
+      - ./html:/app/data:ro
+      - ./data:/app/iliasdata:ro
+    networks:
+      - default
+networks:
+  web:
+    external: true
